@@ -1,12 +1,28 @@
-# K8s service discovery for Witco
+# K8s service discovery
+
+**Project state: POC**
 
 This POC create an application that get IP:port of pods and print them in traefik yaml format.
+
+Possible evolutions:
+* add more storage backends (current storage backend: S3 / minIO)
+* add more output formats (current output format: traefik yaml)
+
+**Architecture**
+
+* this app is installed in each Kubernetes cluster where data must be extracted
+* this app watch K8s endpoints to extract couples of IP:port, called `Backends`
+    * this extract can be filtered by K8s labels
+* this app save `Backends` lists in the defined output formats, in a storage
+
+Then, a bridge must be create for each load balancer solution. In this POC, a minio client download the backends file and push it in a directory that traefik use for dynamic configuration. The file `traefik/cfg/main.yml` is created once by the administrator.
 
 ## Development
 
 Requirements:
 * minikube (installed)
 * skaffold (installed)
+* a docker network (bridge) `my-local-env`: `docker network create my-local-env`
 
 1. Run minikube with CNI bridge
 ```
