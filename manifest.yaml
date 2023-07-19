@@ -1,0 +1,228 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-discovery
+  namespace: default
+# automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: service-discovery
+rules:
+  - apiGroups: [""]
+    resources:
+      - "namespaces"
+      - "pods"
+      - "services"
+      - "endpoints"
+    verbs: ["watch", "list", "get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: service-discovery
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: service-discovery
+subjects:
+  - kind: ServiceAccount
+    name: service-discovery
+    namespace: default
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: service-discovery
+  name: service-discovery
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-discovery
+  template:
+    metadata:
+      labels:
+        app: service-discovery
+    spec:
+      serviceAccountName: service-discovery
+      containers:
+      - image: service-discovery
+        name: service-discovery
+        env:
+        - name: MINIO_ACCESS_KEY_ID
+          value: "minioadmin"
+        - name: MINIO_SECRET_ACCESS_KEY
+          value: "minioadminsecret"
+        - name: MINIO_ENDPOINT
+          value: "minio:9000"
+        - name: MINIO_SSL_ENABLED
+          value: "false"
+        - name: MINIO_BUCKET
+          value: "service-discovery"
+        - name: MINIO_PATH_KEY
+          value: "/test.yml"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: angular-blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: angular-blue
+  template:
+    metadata:
+      labels:
+        app: angular-blue
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: angular-green
+  labels:
+    k8s-service-discovery: "yes"
+spec:
+  ports:
+  - port: 80
+    name: angular
+    appProtocol: 'http'
+  selector:
+    app: angular-green
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: angular-green
+spec:
+  selector:
+    matchLabels:
+      app: angular-green
+  template:
+    metadata:
+      labels:
+        app: angular-green
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: angular-blue
+  labels:
+    k8s-service-discovery: "yes"
+spec:
+  ports:
+  - port: 80
+    name: angular
+    appProtocol: 'http'
+  selector:
+    app: angular-blue
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: angular-black
+spec:
+  selector:
+    matchLabels:
+      app: angular-black
+  template:
+    metadata:
+      labels:
+        app: angular-black
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: angular-black
+spec:
+  ports:
+  - port: 80
+    name: angular
+  selector:
+    app: angular-black
+
+---
+# Deploys a new MinIO Pod into the metadata.namespace Kubernetes namespace
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: minio
+  name: minio
+spec:
+  containers:
+  - name: minio
+    image: quay.io/minio/minio:latest
+    command:
+    - /bin/bash
+    - -c
+    args: 
+    - "mkdir -p /data/service-discovery && minio server /data --console-address :9090"
+    env:
+    - name: MINIO_ROOT_USER
+      value: "minioadmin"
+    - name: MINIO_ROOT_PASSWORD
+      value: "minioadminsecret"
+    volumeMounts:
+    - mountPath: /data
+      name: localvolume
+    ports:
+    - containerPort: 9000
+      name: api
+    - containerPort: 9090
+      name: ui
+  volumes:
+  - name: localvolume
+    hostPath:
+      path: /mnt/disk1/data
+      type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  clusterIP: 10.96.0.100
+  type: NodePort
+  ports:
+  - port: 9000
+    name: api
+    nodePort: 30000
+  - port: 9090
+    name: ui
+    nodePort: 30090
+  selector:
+    app: minio
+

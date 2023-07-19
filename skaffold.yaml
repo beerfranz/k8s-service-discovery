@@ -1,0 +1,17 @@
+apiVersion: skaffold/v4beta4
+kind: Config
+metadata:
+  name: service-discovery
+build:
+  artifacts:
+    - image: service-discovery
+      docker:
+        dockerfile: Dockerfile
+manifests:
+  rawYaml:
+    - manifest.yaml
+
+deploy:
+  kubeContext: minikube
+  kubectl:
+    defaultNamespace: default

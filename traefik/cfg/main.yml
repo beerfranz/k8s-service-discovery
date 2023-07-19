@@ -1,0 +1,13 @@
+http:
+  services:
+    angular:
+      weighted:
+        services:
+        - name: angular-blue-80
+          weight: 3
+        - name: angular-green-80
+          weight: 1
+  routers:
+    angular:
+      rule: "Host(`angular.local`)"
+      service: angular

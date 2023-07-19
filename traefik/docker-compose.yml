@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+
+
+  traefik:
+    image: traefik:2.3.1
+    networks:
+      - my-local-env
+      - minikube
+    volumes:
+      - ./cfg:/etc/traefik.d
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    command:
+      - --api.insecure=true
+      - --providers.file.directory=/etc/traefik.d/ 
+      - --metrics.prometheus=true
+      - --entryPoints.web.address=:80
+      - --entryPoints.websecure.address=:443
+
+  storage:
+    image: quay.io/minio/mc:latest
+    networks:
+      - my-local-env
+      - minikube
+    volumes:
+      - ./cfg:/sync
+    entrypoint: >
+      /bin/sh -c "      
+      /usr/bin/mc config host add myminio http://192.168.49.2:30000 minioadmin minioadminsecret;
+      while true; do
+      echo 'Download config from Minio';
+      /usr/bin/mc cp -r myminio/service-discovery/test.yml.traefik.yaml /sync;
+      sleep 5;
+      done;
+      exit 0;
+      "
+
+networks:
+  my-local-env:
+    external: true
+  minikube:
+    external: true
